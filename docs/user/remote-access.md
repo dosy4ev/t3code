@@ -107,6 +107,14 @@ created in Settings can only be copied from the client that created them while
 its Sharing & access page stays open. If you leave or reload that page, create
 another link to share.
 
+### Rename a machine
+
+A paired machine is named after its computer name. To change it, choose
+**Rename…** in the machine's **…** menu in **Settings → Environments** on web
+or desktop. On mobile, open the machine in **Settings → Environments** and expand
+its connection. The name is saved on that device only, so each device can name
+the machine differently.
+
 ### Reach one machine several ways
 
 A machine can have more than one route: LAN, Tailscale, another VPN, a public

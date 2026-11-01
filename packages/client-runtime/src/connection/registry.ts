@@ -51,6 +51,7 @@ import {
   findRouteToSameAddress,
   hasSavedBearerRoute,
   mergeLearnedRoutes,
+  relabelRoute,
   routesAfterRemoving,
   upsertRoute,
   type ReportedEndpoint,
@@ -150,6 +151,17 @@ export class EnvironmentRegistry extends Context.Service<
       | EnvironmentNotRegisteredError
       | PlatformEnvironmentRemovalError
       | ConnectionBlockedError
+    >;
+    /** Renames the environment on this device only; the open connection is kept. */
+    readonly setLabel: (
+      environmentId: EnvironmentId,
+      label: string,
+    ) => Effect.Effect<
+      void,
+      | Persistence.ConnectionPersistenceError
+      | ConnectionAttemptError
+      | EnvironmentNotRegisteredError
+      | PlatformEnvironmentRemovalError
     >;
     readonly removeRelayEnvironments: () => Effect.Effect<
       void,
@@ -1025,6 +1037,43 @@ export const make = Effect.gen(function* () {
     );
   });
 
+  const setLabel = Effect.fn("EnvironmentRegistry.setLabel")(function* (
+    environmentId: EnvironmentId,
+    input: string,
+  ) {
+    const label = input.trim();
+    if (label === "") {
+      return yield* new ConnectionBlockedError({
+        reason: "configuration",
+        detail: "Environment label cannot be empty.",
+      });
+    }
+    yield* withLeaseLock(
+      environmentId,
+      Effect.gen(function* () {
+        const entry = yield* userEntry(environmentId);
+        const routes = connectionRoutes(entry);
+        if (routes.every((route) => route.target.label === label)) return;
+        const relabeled = routes.map((route) => relabelRoute(route, label));
+        const next = entryWithRoutes(entry, relabeled);
+        for (const route of relabeled) {
+          if (Option.isSome(route.profile)) yield* profiles.put(route.profile.value);
+        }
+        yield* registrations.setRoutes(environmentId, persistedRoutes(next));
+        // The addresses are unchanged, so the open connection stays up.
+        const lease = (yield* SubscriptionRef.get(serviceScopes)).get(environmentId);
+        if (lease !== undefined) {
+          yield* SubscriptionRef.update(serviceScopes, (current) =>
+            new Map(current).set(environmentId, { ...lease, entry: next }),
+          );
+        }
+        yield* SubscriptionRef.update(entries, (current) =>
+          new Map(current).set(environmentId, next),
+        );
+      }),
+    );
+  });
+
   const removeRelayEnvironments = Effect.fn("EnvironmentRegistry.removeRelayEnvironments")(
     function* () {
       const relayEnvironmentIds = [...(yield* SubscriptionRef.get(entries)).values()]
@@ -1193,6 +1242,7 @@ export const make = Effect.gen(function* () {
     remove,
     removeRoute,
     reorderRoutes,
+    setLabel,
     removeRelayEnvironments,
     retryNow,
     setEnabled,

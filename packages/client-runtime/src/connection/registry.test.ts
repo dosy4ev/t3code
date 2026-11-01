@@ -2196,6 +2196,36 @@ describe("EnvironmentRegistry routes", () => {
     }),
   );
 
+  it.effect("renames every route of an environment and rejects an empty label", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness(
+        [RELAY_TARGET, LAN_TARGET],
+        [LAN_PROFILE],
+        [[LAN_TARGET.connectionId, BEARER_CREDENTIAL]],
+      );
+      yield* Effect.gen(function* () {
+        const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+        yield* registry.setLabel(LAN_TARGET.environmentId, "  Work laptop ");
+
+        const routes = routesOf(yield* Ref.get(harness.storedTargets), LAN_TARGET.environmentId);
+        expect(routes.map((target) => [target._tag, target.label])).toEqual([
+          ["RelayConnectionTarget", "Work laptop"],
+          ["BearerConnectionTarget", "Work laptop"],
+        ]);
+        expect((yield* Ref.get(harness.storedProfiles)).get(LAN_PROFILE.connectionId)?.label).toBe(
+          "Work laptop",
+        );
+        expect(
+          (yield* SubscriptionRef.get(registry.entries)).get(LAN_TARGET.environmentId)?.target
+            .label,
+        ).toBe("Work laptop");
+
+        const error = yield* registry.setLabel(LAN_TARGET.environmentId, " ").pipe(Effect.flip);
+        expect(error._tag).toBe("ConnectionBlockedError");
+      }).pipe(Effect.provide(harness.layer), Effect.scoped);
+    }),
+  );
+
   it.effect("removing the last route forgets the environment", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness(

@@ -3,6 +3,7 @@ import {
   ChevronRightIcon,
   ChevronsLeftRightEllipsisIcon,
   EllipsisIcon,
+  PencilIcon,
   RouteIcon,
 } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
@@ -29,6 +30,7 @@ import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { EnvironmentIconMenu } from "./EnvironmentIconPicker";
 import { EnvironmentRoutesList } from "./EnvironmentRoutesList";
+import { RenameEnvironmentDialog } from "./RenameEnvironmentDialog";
 import {
   ConnectionDiagnosisPanel,
   ConnectionDiagnosisSummary,
@@ -117,6 +119,7 @@ export function SavedBackendListRow({
   const [routesOpen, setRoutesOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [diagnosisOpen, setDiagnosisOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const environmentId = environment.environmentId;
   const unsupported = environment.connection.phase === "unsupported";
   const blocked = unsupported && !hasSavedBearerRoute(environment.entry);
@@ -413,6 +416,10 @@ export function SavedBackendListRow({
             environmentId={environmentId}
             serverConfig={environment.serverConfig}
           />
+          <MenuItem onClick={() => setRenameOpen(true)}>
+            <PencilIcon />
+            Rename…
+          </MenuItem>
           <MenuItem onClick={() => setRoutesOpen((open) => !open)}>
             <RouteIcon />
             {routesOpen ? "Hide routes" : "Routes"}
@@ -429,6 +436,13 @@ export function SavedBackendListRow({
           </MenuItem>
         </MenuPopup>
       </Menu>
+      {renameOpen ? (
+        <RenameEnvironmentDialog
+          environmentId={environmentId}
+          label={environment.label}
+          onClose={() => setRenameOpen(false)}
+        />
+      ) : null}
     </EnvironmentRow>
   );
 }

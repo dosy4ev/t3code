@@ -9,10 +9,18 @@ import * as Option from "effect/Option";
 
 import {
   BearerConnectionProfile,
+  SshConnectionProfile,
   type ConnectionCatalogEntry,
+  type ConnectionProfile,
   type ConnectionRoute,
 } from "./catalog.ts";
-import { BearerConnectionTarget, type ConnectionTarget } from "./model.ts";
+import {
+  BearerConnectionTarget,
+  PrimaryConnectionTarget,
+  RelayConnectionTarget,
+  SshConnectionTarget,
+  type ConnectionTarget,
+} from "./model.ts";
 
 export type ConnectionRouteKind =
   | "relay"
@@ -63,6 +71,36 @@ export function routeEntry(
   route: ConnectionRoute,
 ): ConnectionCatalogEntry {
   return entryWithRoutes(entry, [route]);
+}
+
+function relabelTarget(target: ConnectionTarget, label: string): ConnectionTarget {
+  switch (target._tag) {
+    case "PrimaryConnectionTarget":
+      return new PrimaryConnectionTarget({ ...target, label });
+    case "BearerConnectionTarget":
+      return new BearerConnectionTarget({ ...target, label });
+    case "RelayConnectionTarget":
+      return new RelayConnectionTarget({ ...target, label });
+    case "SshConnectionTarget":
+      return new SshConnectionTarget({ ...target, label });
+  }
+}
+
+function relabelProfile(profile: ConnectionProfile, label: string): ConnectionProfile {
+  switch (profile._tag) {
+    case "BearerConnectionProfile":
+      return new BearerConnectionProfile({ ...profile, label });
+    case "SshConnectionProfile":
+      return new SshConnectionProfile({ ...profile, label });
+  }
+}
+
+/** Every route carries the environment's label; the first route's is the one shown. */
+export function relabelRoute(route: ConnectionRoute, label: string): ConnectionRoute {
+  return {
+    target: relabelTarget(route.target, label),
+    profile: Option.map(route.profile, (profile) => relabelProfile(profile, label)),
+  };
 }
 
 export function routeHttpBaseUrl(route: ConnectionRoute): string | null {

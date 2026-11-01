@@ -9,6 +9,7 @@ import type {
   RelayEnvironmentStatusResponse,
 } from "@t3tools/contracts/relay";
 import * as Option from "effect/Option";
+import { AsyncResult } from "effect/reactivity";
 import { useMemo } from "react";
 
 import { environmentCatalog } from "../../connection/catalog";
@@ -39,6 +40,7 @@ export function useConnectionController() {
   const registerEnvironment = useAtomCommand(environmentCatalog.register, "environment register");
   const removeEnvironmentMutation = useAtomCommand(environmentCatalog.remove, "environment remove");
   const retryEnvironmentMutation = useAtomCommand(environmentCatalog.retryNow, "environment retry");
+  const setEnvironmentLabel = useAtomCommand(environmentCatalog.setLabel, { reportFailure: false });
   const setEnvironmentEnabledMutation = useAtomCommand(
     environmentCatalog.setEnabled,
     "environment toggle",
@@ -88,15 +90,24 @@ export function useConnectionController() {
     retryEnvironmentMutation(environmentId);
   const setEnvironmentEnabled = (environmentId: EnvironmentId, enabled: boolean) =>
     setEnvironmentEnabledMutation({ environmentId, enabled });
-  const updateEnvironment = (
+  const updateEnvironment = async (
     environmentId: EnvironmentId,
     updates: { readonly label: string; readonly displayUrl: string },
-  ) =>
-    updateBearer({
-      environmentId,
-      label: updates.label,
-      httpBaseUrl: updates.displayUrl,
-    });
+  ) => {
+    const current = connectedEnvironments.find(
+      (environment) => environment.environmentId === environmentId,
+    );
+    if (current && !current.isRelayManaged && updates.displayUrl !== current.displayUrl) {
+      const result = await updateBearer({
+        environmentId,
+        label: updates.label,
+        httpBaseUrl: updates.displayUrl,
+      });
+      if (!AsyncResult.isSuccess(result)) return result;
+    }
+    // updateBearer relabels only its own route; this renames every route.
+    return setEnvironmentLabel({ environmentId, label: updates.label });
+  };
 
   return {
     connectedEnvironments,
